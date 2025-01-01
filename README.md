@@ -20,8 +20,7 @@ PQR-Tunnel/
 ├── client/
 │   ├── config/
 │   │   ├── .env
-│   │   ├── install_dependencies.sh
-│   │   └── [additional configurations]
+│   │   └── install_dependencies.sh
 │   ├── client.sh
 │   └── README.md
 ├── server/
@@ -124,4 +123,4 @@ Contributions are welcome! Please fork the repository and submit a pull request 
 
 ## License
 
-This project is licensed under [LICENSE_NAME]. See the `LICENSE` file for details.
+This project is licensed under the MIT License. See the `LICENSE` file for details.

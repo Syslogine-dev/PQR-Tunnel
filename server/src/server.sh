@@ -11,10 +11,7 @@ fi
 
 # -- 1) Install dependencies --
 echo "[1/7] Installing dependencies..."
-apt-get update -y
-apt-get install -y \
-  build-essential autoconf automake libtool make cmake ninja-build \
-  pkg-config libssl-dev libkrb5-dev libz-dev libpam0g-dev libselinux1-dev git
+bash config/install_dependencies.sh
 
 # -- 2) Create system user/group (for privilege separation) --
 echo "[2/7] Creating system user..."
@@ -60,19 +57,23 @@ fi
 # -- 5) Configure server --
 echo "[5/7] Configuring server..."
 
+# Backup existing configuration
 mkdir -p "$BACKUP_DIR"
 cp -r /etc/ssh/{config,*_config,ssh_*,*_key*} "$BACKUP_DIR/" 2>/dev/null || true
 echo "Backup created at $BACKUP_DIR"
 
+# Create directory for quantum-safe host keys
 mkdir -p /etc/ssh/quantum_keys
 chmod 755 /etc/ssh/quantum_keys
 
+# Generate quantum-safe Falcon512 host key
 "$INSTALL_PREFIX/bin/ssh-keygen_oqs" -t ssh-falcon512 \
     -f /etc/ssh/quantum_keys/ssh_host_falcon512_key -N "" -q
 chmod 600 /etc/ssh/quantum_keys/ssh_host_falcon512_key
 chmod 644 /etc/ssh/quantum_keys/ssh_host_falcon512_key.pub
 chown "$SSHD_USER:$SSHD_GROUP" /etc/ssh/quantum_keys/ssh_host_falcon512_key*
 
+# Generate classic RSA host key as backup (if not present)
 if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
     ssh-keygen -t rsa -f /etc/ssh/ssh_host_rsa_key -N ""
     chmod 600 /etc/ssh/ssh_host_rsa_key
@@ -80,12 +81,12 @@ if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
     chown "$SSHD_USER:$SSHD_GROUP" /etc/ssh/ssh_host_rsa_key*
 fi
 
+# Generate final SSH configuration
 TEMPLATE_FILE="config/sshd_config_template"
 FINAL_CONFIG_FILE="/etc/ssh/sshd_config_oqs"
 sed "s/{{PORT}}/$NEW_SSH_PORT/" "$TEMPLATE_FILE" > "$FINAL_CONFIG_FILE"
 
-sed -i '/^\(User\|Group\)\b/d' "$FINAL_CONFIG_FILE"
-
+# Ensure privilege separation directory exists
 mkdir -p /var/empty
 chown root:root /var/empty
 chmod 755 /var/empty
@@ -103,30 +104,14 @@ fi
 
 # -- 7) Create systemd service --
 echo "[7/7] Creating systemd service..."
-cat > /etc/systemd/system/sshd_oqs.service << EOF
-[Unit]
-Description=Quantum-Safe OpenSSH Server
-After=network.target
-Documentation=man:sshd(8)
+SERVICE_TEMPLATE="config/sshd_oqs.service.template"
+SYSTEMD_SERVICE_FILE="/etc/systemd/system/sshd_oqs.service"
 
-[Service]
-Type=simple
-Environment="LD_LIBRARY_PATH=$INSTALL_PREFIX/lib"
-ExecStart=$INSTALL_PREFIX/bin/sshd_oqs -D -f $FINAL_CONFIG_FILE
-ExecReload=/bin/kill -HUP \$MAINPID
-KillMode=process
-Restart=on-failure
-RestartSec=3
-RuntimeDirectory=sshd_oqs
-RuntimeDirectoryMode=0755
-StateDirectory=sshd_oqs
-StateDirectoryMode=0755
-User=$SSHD_USER
-Group=$SSHD_GROUP
-
-[Install]
-WantedBy=multi-user.target
-EOF
+sed -e "s|{{INSTALL_PREFIX}}|$INSTALL_PREFIX|g" \
+    -e "s|{{FINAL_CONFIG_FILE}}|$FINAL_CONFIG_FILE|g" \
+    -e "s|{{SSHD_USER}}|$SSHD_USER|g" \
+    -e "s|{{SSHD_GROUP}}|$SSHD_GROUP|g" \
+    "$SERVICE_TEMPLATE" > "$SYSTEMD_SERVICE_FILE"
 
 ldconfig
 systemctl daemon-reload
