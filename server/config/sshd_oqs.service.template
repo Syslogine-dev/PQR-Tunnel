@@ -1,0 +1,22 @@
+[Unit]
+Description=Quantum-Safe OpenSSH Server
+After=network.target
+Documentation=man:sshd(8)
+
+[Service]
+Type=simple
+Environment="LD_LIBRARY_PATH={{INSTALL_PREFIX}}/lib"
+ExecStart={{INSTALL_PREFIX}}/bin/sshd_oqs -D -f {{FINAL_CONFIG_FILE}}
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+RestartSec=3
+RuntimeDirectory=sshd_oqs
+RuntimeDirectoryMode=0755
+StateDirectory=sshd_oqs
+StateDirectoryMode=0755
+User={{SSHD_USER}}
+Group={{SSHD_GROUP}}
+
+[Install]
+WantedBy=multi-user.target

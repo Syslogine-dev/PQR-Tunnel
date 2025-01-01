@@ -1,0 +1,9 @@
+/var/log/sshd_oqs.log {
+    weekly
+    rotate 4
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 640 sshd adm
+}

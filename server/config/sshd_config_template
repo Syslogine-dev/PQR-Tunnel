@@ -1,0 +1,32 @@
+# OQS-SSH specific settings
+Port {{PORT}}
+PidFile /var/run/sshd_oqs.pid
+
+# Basic SSH settings
+Protocol 2
+PermitRootLogin no
+StrictModes yes
+MaxAuthTries 6
+MaxSessions 10
+PubkeyAuthentication yes
+PasswordAuthentication no
+PermitEmptyPasswords no
+ChallengeResponseAuthentication no
+X11Forwarding no
+PrintMotd no
+AcceptEnv LANG LC_*
+Subsystem sftp /usr/lib/openssh/sftp-server
+
+# Quantum-safe settings
+HostKey /etc/ssh/quantum_keys/ssh_host_falcon512_key
+HostKey /etc/ssh/ssh_host_rsa_key
+
+# Enable quantum-safe authentication
+PubkeyAcceptedKeyTypes ssh-falcon512,ssh-rsa
+
+# Enable quantum-safe key exchange
+KexAlgorithms kyber-512-sha256,curve25519-sha256@libssh.org
+
+# Logging
+SyslogFacility AUTH
+LogLevel INFO
