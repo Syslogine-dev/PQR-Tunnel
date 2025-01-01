@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # -- Load Configuration --
-source config/.env
+source "$(dirname "$0")/config/.env"
 
 # -- 0) Check for root privileges --
 if [[ $EUID -ne 0 ]]; then
@@ -11,7 +11,7 @@ fi
 
 # -- 1) Install dependencies --
 echo "[1/7] Installing dependencies..."
-bash config/install_dependencies.sh
+bash "$(dirname "$0")/config/install_dependencies.sh"
 
 # -- 2) Create system user/group (for privilege separation) --
 echo "[2/7] Creating system user..."
@@ -82,7 +82,7 @@ if [ ! -f /etc/ssh/ssh_host_rsa_key ]; then
 fi
 
 # Generate final SSH configuration
-TEMPLATE_FILE="config/sshd_config_template"
+TEMPLATE_FILE="$(dirname "$0")/config/sshd_config_template"
 FINAL_CONFIG_FILE="/etc/ssh/sshd_config_oqs"
 sed "s/{{PORT}}/$NEW_SSH_PORT/" "$TEMPLATE_FILE" > "$FINAL_CONFIG_FILE"
 
@@ -93,7 +93,7 @@ chmod 755 /var/empty
 
 # -- 6) Configure logrotate --
 echo "[6/7] Setting up logrotate..."
-cp config/logrotate_sshd_oqs /etc/logrotate.d/sshd_oqs
+cp "$(dirname "$0")/config/logrotate_sshd_oqs" /etc/logrotate.d/sshd_oqs
 
 # Test SSH configuration
 echo "Testing SSH configuration..."
@@ -104,7 +104,7 @@ fi
 
 # -- 7) Create systemd service --
 echo "[7/7] Creating systemd service..."
-SERVICE_TEMPLATE="config/sshd_oqs.service.template"
+SERVICE_TEMPLATE="$(dirname "$0")/config/sshd_oqs.service.template"
 SYSTEMD_SERVICE_FILE="/etc/systemd/system/sshd_oqs.service"
 
 sed -e "s|{{INSTALL_PREFIX}}|$INSTALL_PREFIX|g" \

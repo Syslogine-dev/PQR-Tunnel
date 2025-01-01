@@ -33,8 +33,7 @@ PQR-Tunnel/
 │   ├── server.sh
 │   └── README.md
 └── shared/
-    ├── README.md
-    └── [shared configuration files]
+    └── README.md
 ```
 
 ---
@@ -44,7 +43,7 @@ PQR-Tunnel/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-repo-name>/PQR-Tunnel.git
+git clone https://github.com/Syslogine-dev/PQR-Tunnel.git
 cd PQR-Tunnel
 ```
 

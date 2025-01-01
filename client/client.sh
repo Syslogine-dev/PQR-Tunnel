@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # -- Load Configuration --
-source config/.env
+source "$(dirname "$0")/config/.env"
 
 # -- 0) Check for root privileges --
 if [[ $EUID -ne 0 ]]; then
@@ -11,7 +11,7 @@ fi
 
 # -- 1) Install dependencies --
 echo "[1/4] Installing dependencies..."
-bash config/install_dependencies.sh
+bash "$(dirname "$0")/config/install_dependencies.sh"
 
 # -- 2) Build and install liboqs --
 echo "[2/4] Building and installing liboqs..."
@@ -58,4 +58,3 @@ Tip: Add the following aliases to your ~/.bashrc for convenience:
   alias qssh='$INSTALL_PREFIX/bin/ssh'
   alias qscp='$INSTALL_PREFIX/bin/scp'
 "
-
