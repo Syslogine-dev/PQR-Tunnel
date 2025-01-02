@@ -100,6 +100,11 @@ build_oqs_ssh() {
     cd "$OQS_SSH_DIR"
     autoreconf -i
 
+    # NOTE: If you see errors referencing OQS_SIG_alg_mayo_*,
+    #       it means your liboqs doesn't include the Mayo algorithm.
+    #       - You can remove Mayo references from ssh-oqs.c, OR
+    #       - Check out a liboqs branch that supports it.
+
     # Configure OQS-SSH with necessary flags
     ./configure \
         --prefix="$INSTALL_PREFIX" \
@@ -112,10 +117,6 @@ build_oqs_ssh() {
     # Compile OQS-SSH
     make -j"$(nproc)"
 }
-
-###############################################################################
-# Continue the file here -- Part 2
-###############################################################################
 
 configure_ssh() {
     echo "[4/5] Setting up SSH configuration..."
@@ -181,9 +182,9 @@ Recommended aliases for .bashrc:
 "
 }
 
-###############################################################################
+# -----------------------------------------------------------------------------
 # 5. Main function to orchestrate all steps
-###############################################################################
+# -----------------------------------------------------------------------------
 main() {
     install_dependencies
     build_liboqs
