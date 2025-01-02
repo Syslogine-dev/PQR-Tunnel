@@ -90,7 +90,7 @@ cd PQR-Tunnel
 
 4. Run the client setup script:
    ```bash
-   ./client.sh
+   sudo ./client.sh
    ```
 
 5. Test the connection to the server:
