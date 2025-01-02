@@ -60,12 +60,13 @@ install_dependencies() {
 
 build_liboqs() {
     echo "[2/5] Building liboqs..."
+
     # Remove any existing liboqs source directory
     rm -rf "$LIBOQS_DIR"
 
     # Clone the specified liboqs version
     if ! git clone -b "$LIBOQS_VERSION" "$LIBOQS_REPO" "$LIBOQS_DIR"; then
-        echo "Failed to clone liboqs from $LIBOQS_REPO."
+        echo "Error: Failed to clone liboqs from $LIBOQS_REPO (branch: $LIBOQS_VERSION)."
         echo "Check your network connection or verify the URL/branch."
         exit 1
     fi
@@ -73,49 +74,77 @@ build_liboqs() {
     cd "$LIBOQS_DIR"
     mkdir build && cd build
 
-    # Configure build with CMake
-    cmake -GNinja \
-          -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-          -DOQS_USE_OPENSSL=OFF \
-          -DBUILD_SHARED_LIBS=ON \
-          ..
+    # Configure the build with CMake
+    if ! cmake -GNinja \
+               -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+               -DOQS_USE_OPENSSL=OFF \
+               -DBUILD_SHARED_LIBS=ON \
+               ..; then
+        echo "Error: CMake configuration for liboqs failed."
+        exit 1
+    fi
 
-    # Build and install liboqs
-    ninja
-    ninja install
+    # Compile liboqs with Ninja
+    if ! ninja; then
+        echo "Error: Ninja build for liboqs failed."
+        exit 1
+    fi
+
+    # Install liboqs
+    if ! ninja install; then
+        echo "Error: Installation for liboqs failed."
+        exit 1
+    fi
+
+    echo "Successfully built and installed liboqs."
 }
+
 
 build_oqs_ssh() {
     echo "[3/5] Building OQS-SSH..."
+
     # Remove any existing OQS-SSH source directory
     rm -rf "$OQS_SSH_DIR"
 
     # Clone the specified OQS-SSH branch
     if ! git clone -b "$OQS_SSH_VERSION" "$OQS_SSH_REPO" "$OQS_SSH_DIR"; then
-        echo "Failed to clone OQS-SSH from $OQS_SSH_REPO."
+        echo "Error: Failed to clone OQS-SSH from $OQS_SSH_REPO (branch: $OQS_SSH_VERSION)."
         echo "Check your network connection or verify the URL/branch."
         exit 1
     fi
 
     cd "$OQS_SSH_DIR"
-    autoreconf -i
+
+    # Generate configure script with autoreconf
+    if ! autoreconf -i; then
+        echo "Error: autoreconf failed for OQS-SSH."
+        exit 1
+    fi
 
     # NOTE: If you see errors referencing OQS_SIG_alg_mayo_*,
     #       it means your liboqs doesn't include the Mayo algorithm.
-    #       - You can remove Mayo references from ssh-oqs.c, OR
-    #       - Check out a liboqs branch that supports it.
+    #       - Remove Mayo references from ssh-oqs.c, OR
+    #       - Use a liboqs branch that supports it.
 
-    # Configure OQS-SSH with necessary flags
-    ./configure \
-        --prefix="$INSTALL_PREFIX" \
-        --with-libs=-loqs \
-        --with-liboqs-dir="$INSTALL_PREFIX" \
-        --with-cflags="-DWITH_KYBER_KEM=1 -DWITH_FALCON=1" \
-        --enable-hybrid-kex \
-        --enable-pq-kex
+    # Configure OQS-SSH with required flags
+    if ! ./configure \
+         --prefix="$INSTALL_PREFIX" \
+         --with-libs=-loqs \
+         --with-liboqs-dir="$INSTALL_PREFIX" \
+         --with-cflags="-DWITH_KYBER_KEM=1 -DWITH_FALCON=1" \
+         --enable-hybrid-kex \
+         --enable-pq-kex; then
+        echo "Error: Configuration step failed for OQS-SSH."
+        exit 1
+    fi
 
     # Compile OQS-SSH
-    make -j"$(nproc)"
+    if ! make -j"$(nproc)"; then
+        echo "Error: Build (make) failed for OQS-SSH."
+        exit 1
+    fi
+
+    echo "Successfully built OQS-SSH."
 }
 
 configure_ssh() {
@@ -128,10 +157,14 @@ configure_ssh() {
     fi
 
     # Create SSH configuration directory
-    mkdir -p /usr/local/etc/ssh
+    if ! mkdir -p /usr/local/etc/ssh; then
+        echo "Error: Failed to create /usr/local/etc/ssh directory."
+        exit 1
+    fi
 
     # Write a basic config that references the new PQ host key
-    cat > /usr/local/etc/sshd_config << EOF
+    # Use a heredoc to create /usr/local/etc/sshd_config
+    cat << EOF > /usr/local/etc/sshd_config
 HostKey /usr/local/etc/ssh/ssh_host_falcon512_key
 HostKeyAlgorithms ssh-falcon512
 KexAlgorithms ml-kem-512-sha256
@@ -140,7 +173,15 @@ PubkeyAuthentication yes
 AuthorizedKeysFile .ssh/authorized_keys
 PasswordAuthentication no
 EOF
+
+    if [[ ! -s /usr/local/etc/sshd_config ]]; then
+        echo "Error: Could not create sshd_config file or file is empty."
+        exit 1
+    fi
+
+    echo "SSH configuration has been set up successfully."
 }
+
 
 install_and_generate_keys() {
     echo "[5/5] Installing binaries and generating keys..."
