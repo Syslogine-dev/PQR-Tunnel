@@ -83,12 +83,17 @@ cd PQR-Tunnel
    - `.env`
    - `install_dependencies.sh`
 
-3. Run the client setup script:
+3. Make the `client.sh` script executable (if not already):
+   ```bash
+   chmod +x client.sh
+   ```
+
+4. Run the client setup script:
    ```bash
    ./client.sh
    ```
 
-4. Test the connection to the server:
+5. Test the connection to the server:
    ```bash
    qssh -p <port> user@<server-ip>
    ```
