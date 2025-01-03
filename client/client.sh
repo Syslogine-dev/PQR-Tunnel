@@ -53,6 +53,33 @@ fi
 # 4. Define Functions for Each Logical Step
 # -----------------------------------------------------------------------------
 
+initialize_logging() {
+    LOG_FILE="/var/log/pqr_tunnel_setup.log"
+    exec > >(tee -a "$LOG_FILE") 2>&1
+    echo "Logging configured. All output will be saved to $LOG_FILE."
+}
+
+validate_environment() {
+    echo "[0/5] Validating environment..."
+
+    # Check for root privileges
+    if [[ $(id -u) -ne 0 ]]; then
+        echo "Error: This script must be run as root or with sudo."
+        exit 1
+    fi
+
+    # Check if required tools are available
+    local required_tools=("git" "cmake" "ninja-build" "gcc" "ldconfig")
+    for tool in "${required_tools[@]}"; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            echo "Error: Required tool '$tool' is not installed."
+            exit 1
+        fi
+    done
+
+    echo "Validation complete. The environment is ready."
+}
+
 install_dependencies() {
     echo "[1/5] Installing dependencies..."
     bash "$(dirname "$0")/config/install_dependencies.sh"
@@ -61,7 +88,16 @@ install_dependencies() {
 build_liboqs() {
     echo "[2/5] Building liboqs..."
 
-    # Remove any existing liboqs source directory
+    # Required dependencies
+    local dependencies=(cmake ninja-build gcc libssl-dev)
+    for pkg in "${dependencies[@]}"; do
+        if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+            echo "Error: Required dependency '$pkg' is not installed."
+            exit 1
+        fi
+    done
+
+    # Remove existing liboqs source directory
     rm -rf "$LIBOQS_DIR"
 
     # Clone the specified liboqs version
@@ -96,14 +132,22 @@ build_liboqs() {
         exit 1
     fi
 
-    echo "Successfully built and installed liboqs."
+    echo "liboqs successfully built and installed."
 }
-
 
 build_oqs_ssh() {
     echo "[3/5] Building OQS-SSH..."
 
-    # Remove any existing OQS-SSH source directory
+    # Required dependencies
+    local dependencies=(autoconf automake libtool make cmake ninja-build pkg-config libssl-dev zlib1g-dev git)
+    for pkg in "${dependencies[@]}"; do
+        if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+            echo "Error: Required dependency '$pkg' is not installed."
+            exit 1
+        fi
+    done
+
+    # Remove existing OQS-SSH source directory
     rm -rf "$OQS_SSH_DIR"
 
     # Clone the specified OQS-SSH branch
@@ -120,11 +164,6 @@ build_oqs_ssh() {
         echo "Error: autoreconf failed for OQS-SSH."
         exit 1
     fi
-
-    # NOTE: If you see errors referencing OQS_SIG_alg_mayo_*,
-    #       it means your liboqs doesn't include the Mayo algorithm.
-    #       - Remove Mayo references from ssh-oqs.c, OR
-    #       - Use a liboqs branch that supports it.
 
     # Configure OQS-SSH with required flags
     if ! ./configure \
@@ -144,7 +183,13 @@ build_oqs_ssh() {
         exit 1
     fi
 
-    echo "Successfully built OQS-SSH."
+    # Install OQS-SSH
+    if ! make install; then
+        echo "Error: Installation failed for OQS-SSH."
+        exit 1
+    fi
+
+    echo "OQS-SSH successfully built and installed."
 }
 
 configure_ssh() {
@@ -162,8 +207,18 @@ configure_ssh() {
         exit 1
     fi
 
+    # Check if the chosen algorithms are available
+    if ! "$INSTALL_PREFIX/bin/ssh" -Q key | grep -q "ssh-falcon512"; then
+        echo "Error: The ssh-falcon512 algorithm is not supported by the installed SSH binaries."
+        exit 1
+    fi
+
+    if ! "$INSTALL_PREFIX/bin/ssh" -Q kex | grep -q "ml-kem-512-sha256"; then
+        echo "Error: The ml-kem-512-sha256 key exchange algorithm is not supported."
+        exit 1
+    fi
+
     # Write a basic config that references the new PQ host key
-    # Use a heredoc to create /usr/local/etc/sshd_config
     cat << EOF > /usr/local/etc/sshd_config
 HostKey /usr/local/etc/ssh/ssh_host_falcon512_key
 HostKeyAlgorithms ssh-falcon512
@@ -179,59 +234,135 @@ EOF
         exit 1
     fi
 
+    # Validate the configuration
+    if ! "$INSTALL_PREFIX/bin/sshd" -t -f /usr/local/etc/sshd_config; then
+        echo "Error: SSH configuration validation failed."
+        exit 1
+    fi
+
     echo "SSH configuration has been set up successfully."
 }
 
 
 install_and_generate_keys() {
-    echo "[5/5] Installing binaries and generating keys..."
+   echo "[5/5] Installing binaries and generating keys..."
 
-    # Install the built SSH binaries into the chosen install prefix
-    cp "$OQS_SSH_DIR"/{ssh,scp,ssh-keygen} "$INSTALL_PREFIX/bin/"
-    chmod +x "$INSTALL_PREFIX/bin/ssh" "$INSTALL_PREFIX/bin/scp" "$INSTALL_PREFIX/bin/ssh-keygen"
+   # Check if binaries exist before copying
+   local binaries=("ssh" "scp" "ssh-keygen")
+   for binary in "${binaries[@]}"; do
+       if [[ ! -f "$OQS_SSH_DIR/$binary" ]]; then
+           echo "Error: $binary binary not found in $OQS_SSH_DIR. Ensure the build was successful."
+           exit 1
+       fi
+   done
 
-    # -------------------------------------------------------------------------
-    # Run ldconfig with Correct Configuration
-    # -------------------------------------------------------------------------
-    # 1. Ensure /usr/local/lib is in /etc/ld.so.conf.d/local.conf
-    local_conf="/etc/ld.so.conf.d/local.conf"
-    if ! grep -q "/usr/local/lib" "$local_conf" 2>/dev/null; then
-        echo "Adding /usr/local/lib to $local_conf..."
-        echo "/usr/local/lib" >> "$local_conf"
-    fi
+   # Install the binaries
+   mkdir -p "$INSTALL_PREFIX/bin/"
+   cp "$OQS_SSH_DIR"/{ssh,scp,ssh-keygen} "$INSTALL_PREFIX/bin/"
+   chmod +x "$INSTALL_PREFIX/bin/ssh" "$INSTALL_PREFIX/bin/scp" "$INSTALL_PREFIX/bin/ssh-keygen"
 
-    # 2. Reload the dynamic linker cache
-    ldconfig
+   # Verify binaries were installed successfully
+   for binary in "${binaries[@]}"; do
+       if [[ ! -x "$INSTALL_PREFIX/bin/$binary" ]]; then
+           echo "Error: $binary could not be installed in $INSTALL_PREFIX/bin."
+           exit 1
+       fi
+   done
 
-    # 3. Generate the host's Falcon-512 SSH key
-    "$INSTALL_PREFIX/bin/ssh-keygen" -t ssh-falcon512 \
+   # -------------------------------------------------------------------------
+   # Configure the dynamic linker
+   # -------------------------------------------------------------------------
+   local local_conf="/etc/ld.so.conf.d/local.conf"
+   if [[ ! -f "$local_conf" ]] || ! grep -q "/usr/local/lib" "$local_conf"; then
+       echo "Adding /usr/local/lib to $local_conf..."
+       echo "/usr/local/lib" >> "$local_conf"
+   fi
+
+   # Reload the dynamic linker cache
+   ldconfig
+   if ! ldconfig -p | grep -q "/usr/local/lib"; then
+       echo "Error: Dynamic linker cache could not be updated."
+       exit 1
+   fi
+
+   # -------------------------------------------------------------------------
+   # Generate the host's Falcon-512 SSH key
+   # -------------------------------------------------------------------------
+   mkdir -p /usr/local/etc/ssh
+   if ! "$INSTALL_PREFIX/bin/ssh-keygen" -t ssh-falcon512 \
         -f /usr/local/etc/ssh/ssh_host_falcon512_key \
-        -N ""
+        -N ""; then
+       echo "Error: Falcon-512 SSH key generation failed."
+       exit 1
+   fi
 
-    echo "
-PQR-Tunnel client setup completed!
+   echo "
+PQR-Tunnel client setup complete!
 
 Generate your own client keys with:
-  $INSTALL_PREFIX/bin/ssh-keygen -t ssh-falcon512
+ $INSTALL_PREFIX/bin/ssh-keygen -t ssh-falcon512
 
-Connect using:
-  $INSTALL_PREFIX/bin/ssh -o HostKeyAlgorithms=ssh-falcon512 -o PubkeyAcceptedAlgorithms=+ssh-falcon512 hostname
+Connect with:
+ $INSTALL_PREFIX/bin/ssh -o HostKeyAlgorithms=ssh-falcon512 -o PubkeyAcceptedAlgorithms=+ssh-falcon512 hostname
 
 Recommended aliases for .bashrc:
-  alias qssh='$INSTALL_PREFIX/bin/ssh -o HostKeyAlgorithms=ssh-falcon512 -o PubkeyAcceptedAlgorithms=+ssh-falcon512'
-  alias qscp='$INSTALL_PREFIX/bin/scp'
+ alias qssh='$INSTALL_PREFIX/bin/ssh -o HostKeyAlgorithms=ssh-falcon512 -o PubkeyAcceptedAlgorithms=+ssh-falcon512'
+ alias qscp='$INSTALL_PREFIX/bin/scp'
 "
 }
+
+test_installation() {
+   echo "[5.5/6] Testing installation..."
+
+   # Check if liboqs is correctly installed
+   if ! ldconfig -p | grep -q liboqs; then
+       echo "Error: liboqs is not correctly installed."
+       exit 1
+   fi
+
+   # Check if the SSH binaries work
+   if ! "$INSTALL_PREFIX/bin/ssh" -V >/dev/null 2>&1; then
+       echo "Error: OQS-SSH binaries are not functioning correctly."
+       exit 1
+   fi
+
+   echo "All components are correctly installed and operational."
+}
+
+cleanup() {
+   echo "[6/6] Cleaning up temporary files..."
+
+   # Remove temporary build directories 
+   rm -rf "$LIBOQS_DIR/build" "$OQS_SSH_DIR/build"
+
+   echo "Cleanup completed."
+}
+
+rollback() {
+   echo "Performing rollback..."
+
+   # Remove installed files
+   rm -rf "$LIBOQS_DIR" "$OQS_SSH_DIR" "$INSTALL_PREFIX"
+
+   echo "Rollback completed. The system has been restored to its original state."
+}
+
 
 # -----------------------------------------------------------------------------
 # 5. Main function to orchestrate all steps
 # -----------------------------------------------------------------------------
 main() {
-    install_dependencies
-    build_liboqs
-    build_oqs_ssh
-    configure_ssh
-    install_and_generate_keys
+    initialize_logging
+    validate_environment
+
+    install_dependencies || rollback
+    build_liboqs || rollback
+    build_oqs_ssh || rollback
+    configure_ssh || rollback
+    install_and_generate_keys || rollback
+
+    test_installation
+    cleanup
 }
 
 # -----------------------------------------------------------------------------
