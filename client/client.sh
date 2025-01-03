@@ -13,7 +13,9 @@ sudo apt update && sudo apt -y install \
     libssl-dev \
     make \
     ninja-build \
-    zlib1g-dev
+    zlib1g-dev \
+    doxygen \
+    graphviz
 
 # Stap 2: SSH-gebruiker en groep aanmaken
 echo "Instellen van SSH-gebruiker en groep..."
