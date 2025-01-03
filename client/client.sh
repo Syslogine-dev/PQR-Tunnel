@@ -3,11 +3,6 @@
 # install_oqs_ssh.sh - Installeert liboqs en OQS-OpenSSH, genereert hybride (Kyber+ECDSA) key,
 #                      en configureert een minimale server/client setup.
 #
-# LET OP: 
-# - Voer dit in een testomgeving uit om te voorkomen dat je bestaande SSH-installatie
-#   onherstelbaar wordt aangepast.
-# - Pas paden/versies aan jouw voorkeur aan.
-# - Zorg dat je een alternatieve console/sessie hebt, want je overschrijft de standaard SSH.
 
 set -euo pipefail
 
@@ -45,7 +40,7 @@ fi
 cd oqs-openssh
 
 # Let op: kies de tak/branch die je wilt gebruiken. "OQS-master" is vaak de meest recente.
-git checkout OQS-master
+git checkout OQS-v9
 
 ./configure --prefix=/opt/oqs-openssh \
             --with-liboqs-dir=/opt/liboqs \
