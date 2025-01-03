@@ -101,6 +101,17 @@ build_oqs_ssh() {
     log "OQS-SSH successfully built and installed."
 }
 
+create_sshd_user() {
+    log "Creating privilege separation user 'sshd'..."
+    if ! id -u sshd >/dev/null 2>&1; then
+        groupadd -r sshd || error_exit "Failed to create 'sshd' group."
+        useradd -r -g sshd -d /var/empty -s /usr/sbin/nologin -c "Privilege-separated SSH" sshd || error_exit "Failed to create 'sshd' user."
+        log "'sshd' user and group created successfully."
+    else
+        log "'sshd' user already exists. Skipping creation."
+    fi
+}
+
 configure_ssh() {
     log "Configuring SSH..."
     mkdir -p /usr/local/etc/ssh
@@ -120,6 +131,17 @@ EOF
     fi
 
     log "SSH configuration set up successfully."
+}
+
+ensure_user_ssh_directory() {
+    log "Ensuring the .ssh directory exists for the current user..."
+    if [[ ! -d "$HOME/.ssh" ]]; then
+        mkdir -p "$HOME/.ssh"
+        chmod 700 "$HOME/.ssh"
+        log ".ssh directory created at $HOME/.ssh."
+    else
+        log ".ssh directory already exists."
+    fi
 }
 
 generate_host_keys() {
@@ -146,7 +168,9 @@ main() {
     build_liboqs
     configure_dynamic_linker
     build_oqs_ssh
+    create_sshd_user  # Ensure the sshd user exists
     configure_ssh
+    ensure_user_ssh_directory
     generate_host_keys
 
     cleanup
