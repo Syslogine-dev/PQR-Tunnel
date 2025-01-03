@@ -790,6 +790,9 @@ setup_permissions() {
 configure_ssh() {
     info "Configuring OQS-SSH..."
 
+    # Ensure SSH_PORT has a default value
+    SSH_PORT=${SSH_PORT:-22}
+
     # Create configuration directory
     install -d -m 0755 "$SSHD_CONFIG_DIR"
 
@@ -849,10 +852,11 @@ EOF
     # Test configuration
     if ! "$INSTALL_PREFIX/sbin/sshd" -t -f "$SSHD_CONFIG_DIR/sshd_config"; then
         error_exit "SSH configuration validation failed"
-    }
+    fi
 
     info "SSH configuration completed"
 }
+
 
 generate_host_keys() {
     info "Generating host keys..."
