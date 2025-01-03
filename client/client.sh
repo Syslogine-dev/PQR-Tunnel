@@ -141,11 +141,15 @@ configure_dynamic_linker() {
 
     local local_conf="/etc/ld.so.conf.d/local-liboqs.conf"
 
+    # Add /usr/local/lib to ld.so configuration if not already present
     if [[ ! -f "$local_conf" ]] || ! grep -q "/usr/local/lib" "$local_conf"; then
         echo "/usr/local/lib" | sudo tee "$local_conf"
-        sudo ldconfig
     fi
 
+    # Reload the dynamic linker cache
+    sudo ldconfig
+
+    # Validate that liboqs is now properly linked
     if ! ldconfig -p | grep -q liboqs; then
         echo "Error: liboqs is not properly linked. Dynamic linker configuration failed."
         exit 1
