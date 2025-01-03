@@ -721,7 +721,7 @@ verify_oqs_ssh_installation() {
         if ! ldd "$binary" | grep -q liboqs; then
             error_exit "Binary $binary not properly linked with liboqs"
         fi
-    }
+    done
 
     # Test SSH keygen functionality
     local test_key="/tmp/test_key_$$"
@@ -732,6 +732,7 @@ verify_oqs_ssh_installation() {
 
     info "OQS-SSH installation verified"
 }
+
 
 # ---------------------------
 # USER AND PERMISSION MANAGEMENT
