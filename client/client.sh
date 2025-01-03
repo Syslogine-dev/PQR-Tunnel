@@ -919,13 +919,13 @@ install_systemd_service() {
 
     # Verify systemd is available
     if ! command -v systemctl >/dev/null 2>&1; then
-        if [[ "$INSTALL_SYSTEMD" == "true" ]]; then
+        if [[ "${INSTALL_SYSTEMD:-false}" == "true" ]]; then
             error_exit "systemd not found but service installation was requested"
         else
             warn "systemd not found, skipping service installation"
             return 0
         fi
-    }
+    fi
 
     # Create service file
     cat > "$SYSTEMD_SERVICE_PATH" <<EOF
@@ -937,8 +937,8 @@ ConditionPathExists=!/etc/ssh/sshd_not_to_be_run
 
 [Service]
 EnvironmentFile=-/etc/default/oqs-ssh
-ExecStartPre=$INSTALL_PREFIX/sbin/sshd -t -f $SSHD_CONFIG_DIR/sshd_config
-ExecStart=$INSTALL_PREFIX/sbin/sshd -f $SSHD_CONFIG_DIR/sshd_config -D
+ExecStartPre=${INSTALL_PREFIX}/sbin/sshd -t -f ${SSHD_CONFIG_DIR}/sshd_config
+ExecStart=${INSTALL_PREFIX}/sbin/sshd -f ${SSHD_CONFIG_DIR}/sshd_config -D
 ExecReload=/bin/kill -HUP \$MAINPID
 KillMode=process
 Restart=on-failure
@@ -974,14 +974,16 @@ EOF
     info "Systemd service installed successfully"
 }
 
+
 # ---------------------------
 # INTEGRATION TESTING
 # ---------------------------
 run_integration_tests() {
+    SKIP_TESTS=${SKIP_TESTS:-false}
     if [[ "$SKIP_TESTS" == "true" ]]; then
         info "Skipping integration tests"
         return 0
-    }
+    fi
 
     info "Running integration tests..."
 
@@ -998,8 +1000,11 @@ run_integration_tests() {
     fi
 
     # Start test server
-    if ! timeout 30 "$INSTALL_PREFIX/sbin/sshd" -f "$test_config" -D -e &
+    timeout 30 "$INSTALL_PREFIX/sbin/sshd" -f "$test_config" -D -e &
     local sshd_pid=$!
+
+    # Trap cleanup to ensure resources are released
+    trap 'kill "$sshd_pid" 2>/dev/null; rm -f "$test_key" "$test_key.pub" "$test_config"' EXIT
 
     # Wait for server to start
     sleep 2
@@ -1013,11 +1018,15 @@ run_integration_tests() {
     fi
 
     # Cleanup
-    kill $sshd_pid 2>/dev/null
+    kill "$sshd_pid" 2>/dev/null
     rm -f "$test_key" "$test_key.pub" "$test_config"
+
+    # Remove trap after successful execution
+    trap - EXIT
 
     info "Integration tests completed successfully"
 }
+
 
 # ---------------------------
 # STATUS REPORTING
