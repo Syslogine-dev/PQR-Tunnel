@@ -68,37 +68,23 @@ validate_environment() {
         exit 1
     fi
 
-    # Check if required tools are available
-    local required_tools=("git" "cmake" "ninja-build" "gcc" "ldconfig")
-    for tool in "${required_tools[@]}"; do
+    # Check if critical tools are available (not covered by install_dependencies.sh)
+    local critical_tools=("git" "ldconfig")
+    for tool in "${critical_tools[@]}"; do
         if ! command -v "$tool" >/dev/null 2>&1; then
-            echo "Error: Required tool '$tool' is not installed."
+            echo "Error: Critical tool '$tool' is not installed. Please install it manually."
             exit 1
         fi
     done
 
-    echo "Validation complete. The environment is ready."
+    echo "Validation complete. The environment is ready for dependency installation."
 }
+
 
 install_dependencies() {
     echo "[1/5] Installing dependencies..."
     bash "$(dirname "$0")/config/install_dependencies.sh"
 }
-
-validate_dependencies() {
-    echo "[1.5/6] Validating installed dependencies..."
-
-    local required_tools=("git" "cmake" "ninja-build" "gcc" "ldconfig")
-    for tool in "${required_tools[@]}"; do
-        if ! command -v "$tool" >/dev/null 2>&1; then
-            echo "Error: Required tool '$tool' is not installed."
-            exit 1
-        fi
-    done
-
-    echo "Dependency validation passed."
-}
-
 
 build_liboqs() {
     echo "[2/5] Building liboqs..."
@@ -369,9 +355,8 @@ rollback() {
 main() {
     initialize_logging
     validate_environment
-    install_dependencies || rollback
-    validate_dependencies || rollback
 
+    install_dependencies || rollback
     build_liboqs || rollback
     build_oqs_ssh || rollback
     configure_ssh || rollback
