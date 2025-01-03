@@ -136,6 +136,25 @@ build_liboqs() {
     echo "liboqs successfully built and installed."
 }
 
+configure_dynamic_linker() {
+    echo "Configuring dynamic linker for liboqs..."
+
+    local local_conf="/etc/ld.so.conf.d/local-liboqs.conf"
+
+    if [[ ! -f "$local_conf" ]] || ! grep -q "/usr/local/lib" "$local_conf"; then
+        echo "/usr/local/lib" | sudo tee "$local_conf"
+        sudo ldconfig
+    fi
+
+    if ! ldconfig -p | grep -q liboqs; then
+        echo "Error: liboqs is not properly linked. Dynamic linker configuration failed."
+        exit 1
+    fi
+
+    echo "Dynamic linker configured successfully."
+}
+
+
 build_oqs_ssh() {
     echo "[3/5] Building OQS-SSH..."
 
@@ -358,6 +377,7 @@ main() {
 
     install_dependencies || rollback
     build_liboqs || rollback
+    configure_dynamic_linker || rollback
     build_oqs_ssh || rollback
     configure_ssh || rollback
     install_and_generate_keys || rollback
