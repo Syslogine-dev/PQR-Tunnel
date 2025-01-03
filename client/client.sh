@@ -59,8 +59,8 @@ initialize_logging() {
     echo "Logging configured. All output will be saved to $LOG_FILE."
 }
 
-validate_environment() {
-    echo "[0/5] Validating environment..."
+validate_pre_environment() {
+    echo "[0/6] Validating pre-installation environment..."
 
     # Check for root privileges
     if [[ $(id -u) -ne 0 ]]; then
@@ -68,7 +68,24 @@ validate_environment() {
         exit 1
     fi
 
-    # Check if required tools are available
+    # Check for essential tools (e.g., apt-get)
+    if ! command -v apt-get >/dev/null 2>&1; then
+        echo "Error: apt-get is required but not installed."
+        exit 1
+    fi
+
+    echo "Pre-installation validation passed."
+}
+
+install_dependencies() {
+    echo "[1/5] Installing dependencies..."
+    bash "$(dirname "$0")/config/install_dependencies.sh"
+}
+
+validate_post_environment() {
+    echo "[1.5/6] Validating post-installation environment..."
+
+    # Check for required tools installed by install_dependencies
     local required_tools=("git" "cmake" "ninja-build" "gcc" "ldconfig")
     for tool in "${required_tools[@]}"; do
         if ! command -v "$tool" >/dev/null 2>&1; then
@@ -77,12 +94,7 @@ validate_environment() {
         fi
     done
 
-    echo "Validation complete. The environment is ready."
-}
-
-install_dependencies() {
-    echo "[1/5] Installing dependencies..."
-    bash "$(dirname "$0")/config/install_dependencies.sh"
+    echo "Post-installation validation passed."
 }
 
 build_liboqs() {
@@ -353,9 +365,10 @@ rollback() {
 # -----------------------------------------------------------------------------
 main() {
     initialize_logging
-    validate_environment
-
+    validate_pre_environment
     install_dependencies || rollback
+    validate_post_environment || rollback
+
     build_liboqs || rollback
     build_oqs_ssh || rollback
     configure_ssh || rollback
