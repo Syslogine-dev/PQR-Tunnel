@@ -22,7 +22,7 @@ echo "[INFO] Systeem updaten en vereiste pakketten installeren..."
 apt-get update
 apt-get install -y build-essential cmake ninja-build git libssl-dev wget \
                    autoconf automake libtool curl make gcc pkg-config \
-                   libxml2-dev libz-dev
+                   libxml2-dev libz-dev doxygen graphviz
 
 #=== 3. liboqs downloaden en bouwen ===#
 echo "[INFO] liboqs downloaden en compileren..."
