@@ -56,7 +56,8 @@ install_packages() {
     libssl-dev \
     zlib1g-dev \
     git \
-    doxygen
+    doxygen \
+    graphviz
 }
 
 ###############################################################################
