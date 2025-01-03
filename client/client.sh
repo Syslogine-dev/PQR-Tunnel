@@ -40,7 +40,7 @@ fi
 cd oqs-openssh
 
 # Let op: kies de tak/branch die je wilt gebruiken. "OQS-master" is vaak de meest recente.
-git checkout OQS-v9
+git checkout OQS-v7.6
 
 ./configure --prefix=/opt/oqs-openssh \
             --with-liboqs-dir=/opt/liboqs \
