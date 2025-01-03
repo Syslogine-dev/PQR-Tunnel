@@ -254,8 +254,8 @@ EOF
         exit 1
     fi
 
-    # Validate the configuration
-    if ! "$INSTALL_PREFIX/bin/sshd" -t -f /usr/local/etc/sshd_config; then
+    # Validate the SSH configuration using the correct sshd binary
+    if ! /usr/local/sbin/sshd -t -f /usr/local/etc/sshd_config; then
         echo "Error: SSH configuration validation failed."
         exit 1
     fi
