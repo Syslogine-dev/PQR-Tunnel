@@ -331,17 +331,56 @@ check_required_commands() {
         autoconf automake libtool pkg-config
         curl wget
     )
-    
+
+    local missing_commands=()
+
+    # Check for missing commands
     for cmd in "${required_commands[@]}"; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
-            if [[ "$FORCE_INSTALL" != "true" ]]; then
-                error_exit "Required command not found: $cmd"
-            else
-                warn "Missing required command: $cmd, continuing due to --force flag"
-            fi
+            missing_commands+=("$cmd")
         fi
     done
+
+    # Exit if commands are missing and FORCE_INSTALL is not enabled
+    if [[ "${#missing_commands[@]}" -gt 0 ]]; then
+        if [[ "${FORCE_INSTALL:-false}" != "true" ]]; then
+            error_exit "The following required commands are missing: ${missing_commands[*]}"
+        else
+            warn "The following commands are missing: ${missing_commands[*]}. Attempting to install them..."
+        fi
+    else
+        info "All required commands are present."
+        return 0
+    fi
+
+    # Install missing commands if FORCE_INSTALL is enabled
+    if command -v apt-get >/dev/null 2>&1; then
+        info "Installing missing commands using apt-get..."
+        apt-get update -y
+        for cmd in "${missing_commands[@]}"; do
+            case "$cmd" in
+                git|curl|wget)
+                    apt-get install -y "$cmd" || error_exit "Failed to install $cmd"
+                    ;;
+                cmake|ninja-build|make)
+                    apt-get install -y build-essential cmake ninja-build || error_exit "Failed to install $cmd"
+                    ;;
+                gcc|g++)
+                    apt-get install -y build-essential || error_exit "Failed to install $cmd"
+                    ;;
+                autoconf|automake|libtool|pkg-config)
+                    apt-get install -y autoconf automake libtool pkg-config || error_exit "Failed to install $cmd"
+                    ;;
+                *)
+                    warn "No package mapping found for $cmd. Skipping installation."
+                    ;;
+            esac
+        done
+    else
+        error_exit "Unable to install missing commands: apt-get not found on this system"
+    fi
 }
+
 
 # ---------------------------
 # NETWORK OPERATIONS
