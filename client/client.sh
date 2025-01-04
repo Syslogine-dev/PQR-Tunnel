@@ -48,7 +48,7 @@ cd ../../../..
 # Stap 4: PQS-SSH installeren
 echo "Clonen en installeren van Open Quantum Safe OpenSSH..."
 OQS_OPENSSH_REPO=${OQS_OPENSSH_REPO:-"https://github.com/open-quantum-safe/openssh.git"}
-OQS_OPENSSH_BRANCH=${OQS_OPENSSH_BRANCH:-"OQS-master"}
+OQS_OPENSSH_BRANCH=${OQS_OPENSSH_BRANCH:-"OQS-v9"}
 PQS_BUILD_DIR="oqs-scripts/tmp/openssh"
 
 rm -rf ${PQS_BUILD_DIR}
