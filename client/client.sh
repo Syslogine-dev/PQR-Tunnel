@@ -25,7 +25,7 @@ install_dependencies() {
     log "Installing dependencies..."
     if [ -f /etc/debian_version ]; then
         sudo apt-get update
-        sudo apt-get install -y autoconf automake cmake gcc libtool libssl-dev make ninja-build zlib1g-dev git
+        sudo apt-get install -y autoconf automake cmake gcc libtool libssl-dev make ninja-build zlib1g-dev git doxygen graphviz
         check_error "Failed to install dependencies"
         
         # Create privilege separation directory and user
@@ -38,7 +38,7 @@ install_dependencies() {
         fi
     else
         log "WARNING: Non-Debian system detected. Please install dependencies manually."
-        log "Required: autoconf automake cmake gcc libtool libssl-dev make ninja-build zlib1g-dev git"
+        log "Required: autoconf automake cmake gcc libtool libssl-dev make ninja-build zlib1g-dev git doxygen graphviz"
     fi
 }
 
