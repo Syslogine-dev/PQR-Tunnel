@@ -20,12 +20,12 @@ check_error() {
     fi
 }
 
-# Install dependencies (Ubuntu)
+# Install dependencies (Ubuntu/Debian)
 install_dependencies() {
     log "Installing dependencies..."
     if [ -f /etc/debian_version ]; then
         sudo apt-get update
-        sudo apt-get install -y autoconf automake cmake gcc libtool libssl-dev make ninja-build zlib1g-dev
+        sudo apt-get install -y autoconf automake cmake gcc libtool libssl-dev make ninja-build zlib1g-dev git
         check_error "Failed to install dependencies"
         
         # Create privilege separation directory and user
@@ -37,14 +37,16 @@ install_dependencies() {
             sudo useradd -g sshd -c 'sshd privsep' -d /var/empty -s /bin/false sshd
         fi
     else
-        log "WARNING: Non-Ubuntu system detected. Please install dependencies manually."
-        log "Required: autoconf automake cmake gcc libtool libssl-dev make ninja-build zlib1g-dev"
+        log "WARNING: Non-Debian system detected. Please install dependencies manually."
+        log "Required: autoconf automake cmake gcc libtool libssl-dev make ninja-build zlib1g-dev git"
     fi
 }
 
 # Set default values
 LIBOQS_REPO=${LIBOQS_REPO:-"https://github.com/open-quantum-safe/liboqs.git"}
 LIBOQS_BRANCH=${LIBOQS_BRANCH:-"main"}
+OPENSSH_REPO=${OPENSSH_REPO:-"https://github.com/open-quantum-safe/openssh.git"}
+OPENSSH_BRANCH=${OPENSSH_BRANCH:-"OQS-v9"}
 PREFIX=${PREFIX:-"$(pwd)/oqs"}
 INSTALL_PREFIX=${INSTALL_PREFIX:-"$(pwd)/oqs-test/tmp"}
 
@@ -81,11 +83,14 @@ main() {
     check_error "Ninja install failed"
     cd ../../..
 
-    # Step 3: Build OpenSSH
+    # Step 3: Clone OpenSSH
+    log "Cloning OpenSSH..."
+    git clone --branch ${OPENSSH_BRANCH} --single-branch ${OPENSSH_REPO} openssh
+    check_error "Failed to clone OpenSSH"
+
+    # Step 4: Build OpenSSH
     log "Building OpenSSH..."
-    if [ -f Makefile ]; then
-        make clean
-    fi
+    cd openssh
     
     autoreconf -i
     check_error "Autoreconf failed"
@@ -109,6 +114,8 @@ main() {
 
     make install
     check_error "Make install failed"
+    
+    cd ..
 
     log "Installation completed successfully!"
     log "OQS-OpenSSH has been installed to: ${INSTALL_PREFIX}"
@@ -120,8 +127,8 @@ main
 
 # Optional: Run basic tests
 log "Running basic tests..."
-if [ -f "oqs-test/run_tests.sh" ]; then
-    ./oqs-test/run_tests.sh
+if [ -d "openssh" ] && [ -f "openssh/oqs-test/run_tests.sh" ]; then
+    cd openssh && ./oqs-test/run_tests.sh
 else
     log "Test script not found. Skipping tests."
 fi
